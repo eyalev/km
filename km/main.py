@@ -28,11 +28,21 @@ def main(source, clear_cache, update):
         print('Cache cleared')
         return True
     
+    import validators
+
+    is_url = validators.url(source)
+    is_file = Path(source).exists()
+
     if source:
-        if 'github.com' in source and 'blob' in source:
-            url = source.replace('blob', 'raw')
-        else:
+        if is_url:
+            if 'github.com' in source and 'blob' in source:
+                url = source.replace('blob', 'raw')
+            else:
+                url = source
+        elif is_file:
             url = source
+        else:
+            raise NotImplementedError
     else:
         url = 'https://github.com/commmands/commands/raw/master/commands_1.commands'
         
@@ -45,9 +55,13 @@ def main(source, clear_cache, update):
     if cache_value:
         temp_commands_path_object.write_text(cache_value)
     else:
-        commands_response = requests.get(url)
-        print(f'Getting: {url}')
-        commands = commands_response.text
+        if is_url:
+            commands_response = requests.get(url)
+            commands = commands_response.text
+        elif is_file:
+            commands = Path(source).read_text()
+        else:
+            raise NotImplementedError
         temp_commands_path_object.write_text(commands)
         cache.set(url, commands, expire=86400)
 

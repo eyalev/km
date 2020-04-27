@@ -12,6 +12,7 @@ python = "^3.6"
 click = "^7.1.1"
 requests = "^2.23.0"
 diskcache = "^4.1.0"
+validators = "^0.14.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
