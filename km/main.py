@@ -29,10 +29,10 @@ def main(source, clear_cache, update):
         print('Cache cleared')
         return True
 
-    is_url = validators.url(source)
-    is_file = Path(source).exists()
-
     if source:
+        is_url = validators.url(source)
+        is_file = Path(source).exists()
+
         if is_url:
             if 'github.com' in source and 'blob' in source:
                 url = source.replace('blob', 'raw')
@@ -54,11 +54,14 @@ def main(source, clear_cache, update):
     if cache_value:
         temp_commands_path_object.write_text(cache_value)
     else:
+        is_url = validators.url(url)
+        is_file = Path(url).exists()
+
         if is_url:
             commands_response = requests.get(url)
             commands = commands_response.text
         elif is_file:
-            commands = Path(source).read_text()
+            commands = Path(url).read_text()
         else:
             raise NotImplementedError
         temp_commands_path_object.write_text(commands)
