@@ -49,7 +49,7 @@ def main(source, clear_cache, update):
         print(f'Getting: {url}')
         commands = commands_response.text
         temp_commands_path_object.write_text(commands)
-        cache.set(url, commands)
+        cache.set(url, commands, expire=86400)
 
     perl_part = "perl -e 'ioctl STDOUT, 0x5412, $_ for split //, do{ chomp($_ = <>); $_ }'"
     command = f"cat {temp_commands_path} | fzf --tac | {perl_part} ; echo"
