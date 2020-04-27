@@ -1,5 +1,6 @@
 import click
 import subprocess
+import validators
 import requests
 from diskcache import Cache
 
@@ -27,8 +28,6 @@ def main(source, clear_cache, update):
         cache.clear()
         print('Cache cleared')
         return True
-    
-    import validators
 
     is_url = validators.url(source)
     is_file = Path(source).exists()
