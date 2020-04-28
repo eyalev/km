@@ -46,7 +46,8 @@ def main(source_param, clear_cache, update):
     else:
         # Default source
         # source = 'https://github.com/commmands/commands/raw/master/commands_1.commands'
-        source = str(Path.home().joinpath('.km/default.commands'))
+        km_dir_path_object = Path.home().joinpath('.km')
+        source = str(km_dir_path_object.joinpath('default.commands'))
 
     cache_value = cache.get(source)
 
@@ -97,6 +98,16 @@ def _get_full_commands_text(commands_text):
 
         else:
             new_lines.append(line)
+
+    # Remove multiple new lines from the end of the file
+    reversed_new_lines = list(reversed(new_lines))
+    for index, line in enumerate(reversed_new_lines):
+        if line.strip() == '' and reversed_new_lines[index+1].strip() == '':
+            reversed_new_lines.pop(index)
+        else:
+            break
+
+    new_lines = list(reversed(reversed_new_lines))
 
     full_text = '\n'.join(new_lines)
 
