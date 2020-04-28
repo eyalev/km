@@ -6,11 +6,12 @@ from diskcache import Cache
 
 from pathlib import Path
 
+
 @click.command()
-@click.option('--source')
+@click.option('--source', 'source_param')
 @click.option('--clear-cache', is_flag=True)
 @click.option('--update', is_flag=True)
-def main(source, clear_cache, update):
+def main(source_param, clear_cache, update):
 
     if clear_cache and update:
         raise NotImplementedError
@@ -29,23 +30,25 @@ def main(source, clear_cache, update):
         print('Cache cleared')
         return True
 
-    if source:
-        is_url = validators.url(source)
-        is_file = Path(source).exists()
+    if source_param:
+        is_url = validators.url(source_param)
+        is_file = Path(source_param).exists()
 
         if is_url:
-            if 'github.com' in source and 'blob' in source:
-                url = source.replace('blob', 'raw')
+            if 'github.com' in source_param and 'blob' in source_param:
+                source = source_param.replace('blob', 'raw')
             else:
-                url = source
+                source = source_param
         elif is_file:
-            url = source
+            source = source_param
         else:
             raise NotImplementedError
     else:
-        url = 'https://github.com/commmands/commands/raw/master/commands_1.commands'
-        
-    cache_value = cache.get(url)
+        # Default source
+        # source = 'https://github.com/commmands/commands/raw/master/commands_1.commands'
+        source = str(Path.home().joinpath('.km/default.commands'))
+
+    cache_value = cache.get(source)
 
     temp_commands_path = '/tmp/km/temp_commands'
     temp_commands_path_object = Path(temp_commands_path)
@@ -54,20 +57,65 @@ def main(source, clear_cache, update):
     if cache_value:
         temp_commands_path_object.write_text(cache_value)
     else:
-        is_url = validators.url(url)
-        is_file = Path(url).exists()
+        is_url = validators.url(source)
+        is_file = Path(source).exists()
 
         if is_url:
-            commands_response = requests.get(url)
+            commands_response = requests.get(source)
             commands = commands_response.text
         elif is_file:
-            commands = Path(url).read_text()
+            commands = Path(source).read_text()
         else:
             raise NotImplementedError
-        temp_commands_path_object.write_text(commands)
-        cache.set(url, commands, expire=86400)
+
+        # Generate full commands with 'includes'
+
+        full_commands_text = _get_full_commands_text(commands)
+
+        temp_commands_path_object.write_text(full_commands_text)
+        cache.set(source, full_commands_text, expire=86400)
 
     perl_part = "perl -e 'ioctl STDOUT, 0x5412, $_ for split //, do{ chomp($_ = <>); $_ }'"
     command = f"cat {temp_commands_path} | fzf --tac | {perl_part} ; echo"
 
     subprocess.call(command, shell=True)
+
+
+def _get_full_commands_text(commands_text):
+
+    lines = commands_text.split('\n')
+
+    new_lines = []
+
+    for line in lines:
+
+        if line.startswith('#include'):
+            source = line.split('#include ')[1]
+            source_text = _get_source_text(source)
+            source_lines = source_text.split('\n')
+            new_lines += source_lines
+
+        else:
+            new_lines.append(line)
+
+    full_text = '\n'.join(new_lines)
+
+    return full_text
+
+
+def _get_source_text(source):
+
+    is_url = validators.url(source)
+    is_file = Path(source).exists()
+
+    if is_url:
+        commands_response = requests.get(source)
+        text = commands_response.text
+    elif is_file:
+        text = Path(source).read_text()
+    else:
+        print('Source is not a url or a file path')
+        raise click.Abort
+
+    return text
+
