@@ -1,3 +1,5 @@
+import os
+
 import click
 import subprocess
 import validators
@@ -5,6 +7,9 @@ import requests
 from diskcache import Cache
 
 from pathlib import Path
+
+cache_dir_path = "/tmp/km/cache"
+cache = Cache(cache_dir_path)
 
 
 @click.command()
@@ -22,12 +27,10 @@ def main(source_param, clear_cache, update):
     km_dir_path_object = Path(km_dir_path)
     km_dir_path_object.mkdir(exist_ok=True)
 
-    cache_dir_path = "/tmp/km/cache"
-    cache = Cache(cache_dir_path)
-
     if clear_cache:
         cache.clear()
         print("Cache cleared")
+        _create_default_commands_file()
         return True
 
     if source_param:
@@ -57,37 +60,60 @@ def main(source_param, clear_cache, update):
     if cache_value:
         temp_commands_path_object.write_text(cache_value)
     else:
-        is_url = validators.url(source)
-        is_file = Path(source).exists()
-
-        if is_url:
-            commands_response = requests.get(source)
-            commands = commands_response.text
-        elif is_file:
-            commands = Path(source).read_text()
-        else:
-            raise NotImplementedError
-
-        # Generate full commands with 'includes'
-
-        full_commands_text = _get_full_commands_text(commands)
-        import os
-
-        full_commands_text_without_empty_lines = os.linesep.join(
-            [s.strip() for s in full_commands_text.splitlines() if s]
-        )
-
-        final_commands = full_commands_text_without_empty_lines
-
-        temp_commands_path_object.write_text(final_commands)
-        cache.set(source, final_commands, expire=86400)
+        commands = _get_commands(source)
+        _create_commands_file(commands, temp_commands_path_object, source=source)
 
     perl_part = (
         "perl -e 'ioctl STDOUT, 0x5412, $_ for split //, do{ chomp($_ = <>); $_ }'"
     )
-    command = f"cat {temp_commands_path} | fzf --tac | {perl_part} ; echo"
+    km_command = f"cat {temp_commands_path} | fzf --tac | {perl_part} ; echo"
 
-    subprocess.call(command, shell=True)
+    subprocess.call(km_command, shell=True)
+
+
+def _get_commands(source):
+    is_url = validators.url(source)
+    is_file = Path(source).exists()
+
+    if is_url:
+        commands_response = requests.get(source)
+        commands = commands_response.text
+    elif is_file:
+        commands = Path(source).read_text()
+    else:
+        raise NotImplementedError
+
+    return commands
+
+
+def _create_commands_file(commands, commands_path_object, source):
+    # Generate full commands with 'includes'
+
+    full_commands_text = _get_full_commands_text(commands)
+
+    full_commands_text_without_empty_lines = os.linesep.join(
+        [s.strip() for s in full_commands_text.splitlines() if s]
+    )
+
+    final_commands = full_commands_text_without_empty_lines
+
+    commands_path_object.write_text(final_commands)
+    cache.set(source, final_commands, expire=86400)
+
+
+def _create_default_commands_file():
+
+    km_dir_path_object = Path.home().joinpath(".km")
+    source = str(km_dir_path_object.joinpath("default.commands"))
+    commands = _get_commands(source)
+
+    default_commands_path = "/tmp/km/default_commands"
+    default_commands_path_object = Path(default_commands_path)
+    default_commands_path_object.parent.mkdir(parents=True, exist_ok=True)
+
+    _create_commands_file(commands, default_commands_path_object, source=source)
+
+    return True
 
 
 def _get_full_commands_text(commands_text):
